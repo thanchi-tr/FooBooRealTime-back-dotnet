@@ -1,9 +1,11 @@
-﻿using FooBooRealTime_back_dotnet.Interface.GameContext;
+﻿using FooBooRealTime_back_dotnet.Controllers.SignalR;
+using FooBooRealTime_back_dotnet.Interface.GameContext;
 using FooBooRealTime_back_dotnet.Interface.Service;
 using FooBooRealTime_back_dotnet.Model.Domain;
 using FooBooRealTime_back_dotnet.Model.DTO;
 using FooBooRealTime_back_dotnet.Model.GameContext;
 using FooBooRealTime_back_dotnet.Utils.Validator;
+using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
 
 namespace FooBooRealTime_back_dotnet.Services.GameContext
@@ -42,21 +44,30 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         /// <returns></returns>
         public async Task<GameSession?> CreateSessionFromContext(string nameId, SessionPlayer host)
         {
-            var context = await GetContext(nameId);
-            if(context == null || context.Rules.Extract() == null) 
-                return null; ;
+            using (var scope = _serviceProvider.CreateScope()) // retrieve the Hub 
+            {
+                var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<GameHub>>();
 
-            var sessionGameData = new SessionGamePlayData(
-                    context.Rules.Extract(),
-                    context.Range,
-                    host.ConnectionId
-                );
+                var context = await GetContext(nameId);
+                Console.WriteLine(context);
+                if (context == null || context.Rules.Extract() == null)
+                    return null;
 
-            var newSession = new GameSession(host, sessionGameData);
-            _activeSession[newSession.SessionId] = newSession;
-            context.Subscribe(newSession);
-            _playerSessions[host.ConnectionId] = newSession;
-            return newSession;
+                var sessionGameData = new SessionGamePlayData(
+                        context.Rules.Extract(),
+                        context.Range,
+                        host.ConnectionId
+                    );
+
+                var newSession = new GameSession(
+                        hubContext,
+                    host,
+                    sessionGameData);
+                _activeSession[newSession.SessionId] = newSession;
+                context.Subscribe(newSession);
+                _playerSessions[host.ConnectionId] = newSession;
+                return newSession;
+            }
         }
 
         public GameSession? GetSessionOf(string connectionId)
@@ -72,10 +83,10 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         {
 
             var observers = _gameContexts[nameId].GetObservers();
-            return (GameSession[]) observers.Where(o => o.GetType() == typeof(GameSession)).ToArray();
+            return (GameSession[])observers.Where(o => o.GetType() == typeof(GameSession)).ToArray();
 
         }
-        public GameSession? RetrieveSession(Guid sessionId )
+        public GameSession? RetrieveSession(Guid sessionId)
         {
             return _activeSession[sessionId];
         }
@@ -87,13 +98,15 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         /// <returns></returns>
         public async Task<Game?> GetContext(string nameId)
         {
-
-            var target = _gameContexts[nameId];
+            Game? target = null;
+            if (_gameContexts.ContainsKey(nameId))
+                target = _gameContexts?[nameId];
             if (target == null) // cache missed
             {
                 using (var scope = _serviceProvider.CreateScope())
                 {
                     var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
+
                     target = await gameService.GetByIdAsync(nameId);
                     _gameContexts[target.GameId] = target;
                     _logger.LogInformation($"Game Master: Cache missed, load {target.GameId} into Game master");
@@ -101,8 +114,8 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                     return target;
                 }
             }
-
-            return null;
+            Console.WriteLine(target);
+            return target;
         }
 
         public void Refresh(GameDTO changes)

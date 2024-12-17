@@ -1,6 +1,7 @@
 ﻿using FooBooRealTime_back_dotnet.Interface.Service;
 using FooBooRealTime_back_dotnet.Model.Domain;
 using FooBooRealTime_back_dotnet.Model.DTO;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FooBooRealTime_back_dotnet.Controllers
@@ -10,6 +11,7 @@ namespace FooBooRealTime_back_dotnet.Controllers
     /// </summary>
     [ApiController]
     [Route("Players/")]
+    [Authorize]
     public class PlayerController : ControllerBase
     {
         private readonly ILogger<IPlayerService> _logger;

@@ -1,14 +1,15 @@
 ﻿using FooBooRealTime_back_dotnet.Interface.GameContext;
 using FooBooRealTime_back_dotnet.Model.DTO;
+using FooBooRealTime_back_dotnet.Model.GameContext;
 using FooBooRealTime_back_dotnet.Utils.Validator;
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
 
-namespace FooBooRealTime_back_dotnet.Model.GameContext
+namespace FooBooRealTime_back_dotnet.Services.GameContext
 {
 
-    public class SessionGamePlayData 
+    public class SessionGamePlayData
     {
         public const int ERROR = -1;
         private readonly object _lock = new object();
@@ -106,7 +107,7 @@ namespace FooBooRealTime_back_dotnet.Model.GameContext
             var result = Eval(answer, _gameData[
                                     _gamesQuestionSet[target.CurrenctQuestionIndex] // the question
                                     ]);
-            target.CorrectCount += (result) ? 1 : 0;
+            target.CorrectCount += result ? 1 : 0;
             target.CurrenctQuestionIndex++;
             // if the player is @first place.
             if (_gamesQuestionSet.Count <= target.CurrenctQuestionIndex)
@@ -159,7 +160,7 @@ namespace FooBooRealTime_back_dotnet.Model.GameContext
         /// </summary>
         /// <param name="connectionId"></param>
         /// <returns></returns>
-        public Boolean OnPlayerJoin(string connectionId)
+        public bool OnPlayerJoin(string connectionId)
         {
             if (CurrentState == GameState.PLAYING)
             {
@@ -176,11 +177,11 @@ namespace FooBooRealTime_back_dotnet.Model.GameContext
         {
             var target = Participants
                 .Find(p => p.playerConnectionId == connectionId);
-            if( target != null )
-                target.playerConnectionId= newConnectionId;
+            if (target != null)
+                target.playerConnectionId = newConnectionId;
         }
 
-        public Boolean Eval(string answer, string[] expectedSubStrs)
+        public bool Eval(string answer, string[] expectedSubStrs)
         {
             var expectedSubStrTotalLength = expectedSubStrs.Aggregate(0, (length, str) => length += str.Length);
             if (answer.Length != expectedSubStrTotalLength)
@@ -192,7 +193,7 @@ namespace FooBooRealTime_back_dotnet.Model.GameContext
             return AttemptSlice(answer, expectedSubStrs);
         }
 
-        public Boolean AttemptSlice(string str, string[] stringList)
+        public bool AttemptSlice(string str, string[] stringList)
         {
             // base case
             var trimmedStr = str.Trim('\t');
@@ -209,16 +210,16 @@ namespace FooBooRealTime_back_dotnet.Model.GameContext
             List<string> potentialLeftOver = [];
             if (str == exptedStr && subArray.Length == 0)
                 return true;
-            for (int i = 0; i < (str.Length - exptedStr.Length + 1); i++)
+            for (int i = 0; i < str.Length - exptedStr.Length + 1; i++)
             {
                 var matchingStr = str.Substring(i, exptedStr.Length);
                 if (matchingStr == exptedStr)
                 {
 
-                    potentialLeftOver.Add(str[0..(i)] + "\t" + str[(exptedStr.Length + i)..(str.Length)]);
+                    potentialLeftOver.Add(str[0..i] + "\t" + str[(exptedStr.Length + i)..str.Length]);
                 }
             }
-            return (potentialLeftOver.Count == 0)
+            return potentialLeftOver.Count == 0
                 ? false // an expected sub str not found: must be false
                 : potentialLeftOver
                 // any expression tree yield a true.

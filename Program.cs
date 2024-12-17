@@ -1,6 +1,8 @@
 
 using backend.Configurations;
 using FooBooRealTime_back_dotnet.Configuration;
+using FooBooRealTime_back_dotnet.Controllers.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using Serilog;
 
 namespace FooBooRealTime_back_dotnet
@@ -17,6 +19,10 @@ namespace FooBooRealTime_back_dotnet
                 options.ListenAnyIP(5001, listenOption => // use https only
                 {
                     listenOption.UseHttps();
+                });
+                options.ConfigureHttpsDefaults(httpsOptions =>
+                {
+                    httpsOptions.AllowAnyClientCertificate();
                 });
 
             });
@@ -52,11 +58,18 @@ namespace FooBooRealTime_back_dotnet
                     app.UseSwagger();
                     app.UseSwaggerUI();
                 }
+
                 app.UseSerilogRequestLogging();
                 app.UseHttpsRedirection();
+                app.UseRouting();
+                app.UseAuthentication();
                 app.UseAuthorization();
-                app.MapControllers();
-
+                // Map routes and hubs
+                app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapControllers();
+                    endpoints.MapHub<GameHub>("hub/game");
+                });
                 Log.Information("Server successfully started");
                 app.Run();
 

@@ -1,6 +1,7 @@
 ﻿using FooBooRealTime_back_dotnet.Interface.Service;
 using FooBooRealTime_back_dotnet.Model.Domain;
 using FooBooRealTime_back_dotnet.Model.DTO;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -8,6 +9,7 @@ namespace FooBooRealTime_back_dotnet.Controllers
 {
     [ApiController]
     [Route("")]
+    [Authorize]
     public class GameController : ControllerBase
     {
         private readonly ILogger<IGameService> _logger;

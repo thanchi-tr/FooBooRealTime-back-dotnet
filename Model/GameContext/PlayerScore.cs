@@ -6,5 +6,6 @@
         public int CurrenctQuestionIndex = -1;
         public int CorrectCount = 0;
         public Boolean IsReady = false;
+        public Boolean IsDisconnect = false;
     }
 }
