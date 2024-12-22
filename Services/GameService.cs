@@ -25,7 +25,7 @@ namespace FooBooRealTime_back_dotnet.Services
         public override async Task<Game?> GetByIdAsync(string id)
         {
             var target = await base.GetByIdAsync(id);
-            target.AuthorId = null;
+            
             return target;
         }
 

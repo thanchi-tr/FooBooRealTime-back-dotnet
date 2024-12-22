@@ -83,11 +83,11 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             switch (CurrentState)
             {
                 case GameState.WAITING:
+                    Reset();
                     CurrentState = GameState.PLAYING;
                     break;
                 case GameState.PLAYING:
                     // place to do scoring, notify player game end with their performance
-                    Reset();
                     CurrentState = GameState.WAITING;
                     break;
                 default:
