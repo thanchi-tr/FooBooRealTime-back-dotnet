@@ -2,7 +2,9 @@
 using backend.Configurations;
 using FooBooRealTime_back_dotnet.Configuration;
 using FooBooRealTime_back_dotnet.Controllers.SignalR;
+using FooBooRealTime_back_dotnet.Data;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using QuizApp.Configurations;
 using Serilog;
 
@@ -53,6 +55,22 @@ namespace FooBooRealTime_back_dotnet
                 Log.Information("Starting up the server...");
 
                 var app = builder.Build();
+
+                // migrate data of DBContext
+                using (var scope = app.Services.CreateScope())
+                {
+                    var services = scope.ServiceProvider;
+                    try
+                    {
+                        var context = services.GetRequiredService<FooBooDbContext>();
+                        context.Database.Migrate(); // Apply migrations
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log errors during migration
+                        app.Logger.LogError(ex, "An error occurred while migrating the database.");
+                    }
+                }
                 // ensure Swagger API not available in production.
                 if (app.Environment.IsDevelopment())
                 {

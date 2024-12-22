@@ -1,8 +1,8 @@
 version: '3.8'
 services:
   app:
-    image: ssldemo:v1
-    container_name: ssl_app
+    image: fizzbuzz
+    container_name: fizzbuzzbackdotnet
     ports:
       - "8080:80"        # Map HTTP port
       - "8081:443"       # Map HTTPS port
@@ -11,7 +11,7 @@ services:
     environment:
       ASPNETCORE_URLS: "https://+;http://+"
       ASPNETCORE_HTTPS_PORT: 7001
-      ASPNETCORE_Kestrel__Certificates__Default__Password: "Xuan12343@"
+      ASPNETCORE_Kestrel__Certificates__Default__Password: "Xuan12343@" # for now, it is a developer environment so i am not too strict
       ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/dockerdemo.pfx"
     volumes:
       - C:\Users\thanc\.aspnet\https:/https/
