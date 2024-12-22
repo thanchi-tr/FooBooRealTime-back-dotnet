@@ -3,6 +3,7 @@ using FooBooRealTime_back_dotnet.Model.DTO;
 using FooBooRealTime_back_dotnet.Model.GameContext;
 using FooBooRealTime_back_dotnet.Utils.Validator;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 
@@ -65,6 +66,16 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             }
             _gamesQuestionSet.Clear();
             _gameData.Clear();
+        }
+
+        public void EraseDataOf(string potentialParticipantConnId)
+        {
+            var target = Participants.Find(p => p.playerConnectionId == potentialParticipantConnId);
+
+            if (target == null)
+                return;
+
+            Participants.Remove(target);
         }
 
         public void NextState()

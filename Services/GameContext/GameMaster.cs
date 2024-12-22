@@ -141,6 +141,27 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             return target;
         }
 
+
+        public Guid? OnPlayerLeftSession(string requestorConnectionId)
+        {
+            // Each player can be connect to one session at a time,
+            var requestorSession = _playerSessions[requestorConnectionId];
+
+            if (requestorSession == null)
+                return null;
+            requestorSession.OnLeftSession(requestorConnectionId);
+
+            // if session is dead (no one left) then dispose it
+            if (requestorSession.GetStatus() == SessionStatus.Dead)
+            {
+                _activeSession.Remove(requestorSession.SessionId, out var disposedSession);
+                _logger.LogInformation($"Session: {requestorSession.SessionId} is Dead and Disposed");
+            }
+            return requestorSession.SessionId;
+
+        }
+
+
         public void Refresh(GameDTO changes)
         {
             throw new NotImplementedException();

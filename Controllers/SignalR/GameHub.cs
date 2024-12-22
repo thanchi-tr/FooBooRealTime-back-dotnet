@@ -217,10 +217,15 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         /// Handle when player call to leave their respected session
         /// </summary>
         /// <returns></returns>
-        public async Task LeftSession()
+        public void LeftSession()
         {
+            _logger.LogInformation($"Player:: {Context.ConnectionId} request to leave their Current Game Session");
             // delegate task to the game master
-            //_gameMaster.OnPlayerLeftSession(Context.ConnectionId);
+            var sessionId = _gameMaster.OnPlayerLeftSession(Context.ConnectionId);
+
+            // we can decide if we want to notify all player in this group that player left
+            // for now do nothing
+            _logger.LogInformation($"Player:: {Context.ConnectionId} is expelled from Session: {sessionId}");
         }
     }
 }

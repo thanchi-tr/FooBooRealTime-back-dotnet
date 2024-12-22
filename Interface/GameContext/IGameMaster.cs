@@ -25,5 +25,7 @@ namespace FooBooRealTime_back_dotnet.Interface.GameContext
         public GameSession? GetSessionOf(string connectionId);
 
         public Task<string[]> RetrieveAllGames();
+
+        public Guid? OnPlayerLeftSession(string requestorConnectionId);
     }
 }

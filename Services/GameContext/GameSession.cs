@@ -58,11 +58,37 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         }
 
 
+        /// <summary>
+        /// Handle scenario where player is 
+        /// </summary>
+        /// <param name="participantConnectionId"></param>
+        public void OnLeftSession(string participantConnectionId)
+        {
+            var target = _participants.Find(p => p.ConnectionId == participantConnectionId);
+
+            if (target == null)
+                return; // target is not in this session
+
+            _gamePlayData.EraseDataOf(target.ConnectionId);
+            _participants.Remove(target);
+        }
+
+        /// <summary>
+        /// Active: if there some player in room
+        /// Dead: empty session and should be dispose
+        /// </summary>
+        public SessionStatus GetStatus()
+        {
+            return (_participants.Count > 0)
+                ? SessionStatus.Active
+                : SessionStatus.Dead;
+        }
+
         public void Disconnect(string playerConnectionId)
         {
             var target = _participants
                         .Find(p => p.ConnectionId == playerConnectionId);
-            if (target != null)
+            if (target == null)
                 target.IsConnected = false;
         }
 
