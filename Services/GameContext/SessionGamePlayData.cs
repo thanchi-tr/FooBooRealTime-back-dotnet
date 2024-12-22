@@ -1,6 +1,8 @@
 ﻿using FooBooRealTime_back_dotnet.Interface.GameContext;
+using FooBooRealTime_back_dotnet.Interface.Utils;
 using FooBooRealTime_back_dotnet.Model.DTO;
 using FooBooRealTime_back_dotnet.Model.GameContext;
+using FooBooRealTime_back_dotnet.Utils.Generator;
 using FooBooRealTime_back_dotnet.Utils.Validator;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -15,6 +17,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         public const int ERROR = -1;
         private readonly object _lock = new object();
         private Random random = new Random();
+        private IRandomIntSource _random = new RandomIntSource();
         public Dictionary<int, string> Rules { get; private set; }
         protected int _gameRange;
         public GameState CurrentState { get; private set; } = GameState.WAITING;
@@ -27,7 +30,8 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         public SessionGamePlayData(
             Dictionary<int, string> rules,
             int gameRange,
-            string hostConnectionId)
+            string hostConnectionId
+            )
         {
             Rules = rules;
             _gameRange = gameRange;
@@ -149,20 +153,24 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         /// <returns></returns>
         private int GenerateNewQuestion()
         {
-            var potential = random.Next(1, _gameRange);
-            while (_gameData.ContainsKey(potential))
-            {
-                potential = random.Next(0, _gameRange);
-            }
-            _gamesQuestionSet.Add(potential);
-            List<string> solutionAnswerSubStr = [];
-            foreach (var rule in Rules)
-            {
-                if (potential % rule.Key == 0)
-                    solutionAnswerSubStr.Add(rule.Value);
-            }
-            _gameData[potential] = solutionAnswerSubStr.ToArray();
-            return potential;
+            //var potential = random.Next(1, _gameRange);
+            //while (_gameData.ContainsKey(potential))
+            //{
+            //    potential = random.Next(0, _gameRange);
+            //}
+            //_gamesQuestionSet.Add(potential);
+            _gamesQuestionSet.Generate(_gameRange, _random);
+            var generatedQuesiton = _gamesQuestionSet[_gamesQuestionSet.Count - 1];
+
+            //List<string> solutionAnswerSubStr = [];
+            //foreach (var rule in Rules)
+            //{
+            //    if (generatedQuesiton % rule.Key == 0)
+            //        solutionAnswerSubStr.Add(rule.Value);
+            //}
+            //_gameData[generatedQuesiton] = solutionAnswerSubStr.ToArray();
+            _gameData.GenerateAnswerComposition(Rules, generatedQuesiton);
+            return generatedQuesiton;
         }
 
 
@@ -185,6 +193,11 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             return true;
         }
 
+        /// <summary>
+        /// @Not in use
+        /// </summary>
+        /// <param name="connectionId"></param>
+        /// <param name="newConnectionId"></param>
         public void OnPlayerReconnect(string connectionId, string newConnectionId)
         {
             var target = Participants
