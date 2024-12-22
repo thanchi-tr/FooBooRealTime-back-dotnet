@@ -7,6 +7,7 @@ using FooBooRealTime_back_dotnet.Model.GameContext;
 using FooBooRealTime_back_dotnet.Utils.Validator;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
+using static Azure.Core.HttpHeader;
 
 namespace FooBooRealTime_back_dotnet.Services.GameContext
 {
@@ -35,6 +36,27 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         {
             _activePlayers[connectionId] = player;
         }
+
+        public async Task<string[]> RetrieveAllGames()
+        {
+            try
+            {
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
+
+                    var games = await gameService.GetAllAsync();
+
+                    return games.Select(g => g.GameId).ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+
         /// <summary>
         /// Create a brand new session off of a context with nameId.
         /// [intended to use with signal R <-> host have the connectionId]
@@ -62,7 +84,8 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                 var newSession = new GameSession(
                         hubContext,
                     host,
-                    sessionGameData);
+                    sessionGameData,
+                    nameId);
                 _activeSession[newSession.SessionId] = newSession;
                 context.Subscribe(newSession);
                 _playerSessions[host.ConnectionId] = newSession;

@@ -14,5 +14,6 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         public const string NotifyError = "NotifyError";
         public const string SupplySessionInfo = "SupplySessionInfo";
         public const string NotifyGameEnd = "NotifyGameEnd";
+        public const string SupplyGameContexts = "SupplyGameContexts";
     }
 }

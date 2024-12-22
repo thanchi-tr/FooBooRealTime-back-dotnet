@@ -8,8 +8,8 @@ using Swashbuckle.AspNetCore.Annotations;
 namespace FooBooRealTime_back_dotnet.Controllers
 {
     [ApiController]
-    [Route("")]
-    [Authorize]
+    [Route("Api/")]
+    //[Authorize]
     public class GameController : ControllerBase
     {
         private readonly ILogger<IGameService> _logger;

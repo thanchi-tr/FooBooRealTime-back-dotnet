@@ -10,8 +10,9 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
     public class GameSession : IObserver
     {
 
-        private readonly IHubContext<GameHub>? _hubConnection;
         const int NOT_SET = -1;
+        private readonly IHubContext<GameHub>? _hubConnection;
+
         private object _lock = new object();
         public Guid SessionId { get; set; } = Guid.NewGuid();
         private double _gameDurationInMinute = NOT_SET;
@@ -19,9 +20,10 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         private SessionGamePlayData _gamePlayData { get; set; }
 
         private SessionPlayer _host { get; set; }
-
-        public GameSession(IHubContext<GameHub> hubContext, SessionPlayer host, SessionGamePlayData gamePlayData)
+        public string GameName { get; set; }
+        public GameSession(IHubContext<GameHub> hubContext, SessionPlayer host, SessionGamePlayData gamePlayData, string name)
         {
+            GameName = name;
             _host = host;
             _gamePlayData = gamePlayData;
             lock (_lock)
@@ -31,7 +33,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             _hubConnection = hubContext;
         }
 
-
+        public Dictionary<int, string> GetRules() => _gamePlayData.Rules;
 
         /// <summary>
         /// 
@@ -47,7 +49,8 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             
             if (actionResult)
             {
-                _participants.Add(player);
+                if(!_participants.Contains(player))
+                    _participants.Add(player);
 
             }
 

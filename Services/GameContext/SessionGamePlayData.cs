@@ -162,14 +162,15 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         /// <returns></returns>
         public bool OnPlayerJoin(string connectionId)
         {
-            if (CurrentState == GameState.PLAYING)
+            if (CurrentState == GameState.PLAYING )
             {
                 // Notfify the player about this event
                 return false;
             }
-            Participants.Add(
-                new PlayerScore { playerConnectionId = connectionId }
-                );
+            if(Participants.Find(p => p.playerConnectionId == connectionId) == null)
+                Participants.Add(
+                    new PlayerScore { playerConnectionId = connectionId }
+                    );
             return true;
         }
 

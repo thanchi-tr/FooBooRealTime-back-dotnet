@@ -10,8 +10,8 @@ namespace FooBooRealTime_back_dotnet.Controllers
     /// This is a debug controller, the actual authentication will need to be in auth route
     /// </summary>
     [ApiController]
-    [Route("Players/")]
-    [Authorize]
+    [Route("Api/Players/")]
+    //[Authorize]
     public class PlayerController : ControllerBase
     {
         private readonly ILogger<IPlayerService> _logger;

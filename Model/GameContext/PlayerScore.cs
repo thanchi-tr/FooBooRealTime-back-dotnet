@@ -2,10 +2,10 @@
 {
     public class PlayerScore
     {
-        public string playerConnectionId;
-        public int CurrenctQuestionIndex = -1;
-        public int CorrectCount = 0;
-        public Boolean IsReady = false;
-        public Boolean IsDisconnect = false;
+        public string playerConnectionId { get; set; }
+        public int CurrenctQuestionIndex { get; set; } = -1;
+        public int CorrectCount { get; set; } = 0;
+        public Boolean IsReady { get; set; } = false;
+        public Boolean IsDisconnect { get; set; } = false;
     }
 }

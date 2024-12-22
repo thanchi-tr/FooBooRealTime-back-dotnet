@@ -3,6 +3,7 @@ using backend.Configurations;
 using FooBooRealTime_back_dotnet.Configuration;
 using FooBooRealTime_back_dotnet.Controllers.SignalR;
 using Microsoft.AspNetCore.SignalR;
+using QuizApp.Configurations;
 using Serilog;
 
 namespace FooBooRealTime_back_dotnet
@@ -32,7 +33,7 @@ namespace FooBooRealTime_back_dotnet
 
             builder.Services.ConfigureRegisteredServices();
             builder.Services.ConfigureDependancies(builder.Configuration);
-
+            builder.Services.ConfigureCors();
             builder.Services.AddControllers()
                 .AddNewtonsoftJson(options =>
                 {
@@ -58,10 +59,11 @@ namespace FooBooRealTime_back_dotnet
                     app.UseSwagger();
                     app.UseSwaggerUI();
                 }
-
+                
                 app.UseSerilogRequestLogging();
                 app.UseHttpsRedirection();
                 app.UseRouting();
+                app.UseCors("AllowSpecificOrigin");
                 app.UseAuthentication();
                 app.UseAuthorization();
                 // Map routes and hubs

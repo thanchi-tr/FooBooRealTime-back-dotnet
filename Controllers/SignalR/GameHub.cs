@@ -9,7 +9,7 @@ using System;
 
 namespace FooBooRealTime_back_dotnet.Controllers.SignalR
 {
-    [Authorize]
+    //[Authorize]
     public class GameHub : Hub
     {
         private IGameMaster _gameMaster;
@@ -22,6 +22,8 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
             _logger = logger;
             _playerService = playerService;
         }
+
+
 
         /// <summary>
         /// Connection to hub onlly occur where player is authenticated 
@@ -61,7 +63,7 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                     activeSession.Join(_gameMaster.GetActivePlayerDetail(Context.ConnectionId));
 
                     await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Player is connect to Room {sessionIdStr}");
-                    // add the player into a dedicate channel
+                    await Clients.Caller.SendAsync(ClientMethods.SupplySessionInfo, activeSession.GameName, activeSession.GetRules());
                     await Groups.AddToGroupAsync(Context.ConnectionId, sessionIdStr);
                 }
             }
@@ -112,6 +114,19 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                 await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Player {Context.ConnectionId} is Toggling Ready state");
                 _logger.LogInformation($"Player {Context.ConnectionId} is Toggling Ready state");
 
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"SignalR: catch {ex}");
+            }
+        }
+
+        public async Task RequestAvailableGameContexts()
+        {
+            try
+            {
+                var contexts = await _gameMaster.RetrieveAllGames();
+                await Clients.Caller.SendAsync(ClientMethods.SupplyGameContexts, contexts);
             }
             catch (Exception ex)
             {
@@ -195,6 +210,17 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
             }
             _logger.LogInformation($"Player {Context.ConnectionId} is unauthorise to set Game time of Session {targetSession.SessionId}");
 
+        }
+
+
+        /// <summary>
+        /// Handle when player call to leave their respected session
+        /// </summary>
+        /// <returns></returns>
+        public async Task LeftSession()
+        {
+            // delegate task to the game master
+            //_gameMaster.OnPlayerLeftSession(Context.ConnectionId);
         }
     }
 }
