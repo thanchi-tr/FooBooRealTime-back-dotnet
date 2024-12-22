@@ -82,6 +82,7 @@ namespace FooBooRealTime_back_dotnet
                 app.UseHttpsRedirection();
                 app.UseRouting();
                 app.UseCors("AllowSpecificOrigin");
+                app.UseCors("Allow3001");
                 app.UseAuthentication();
                 app.UseAuthorization();
                 // Map routes and hubs

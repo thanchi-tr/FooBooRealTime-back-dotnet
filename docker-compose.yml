@@ -1,6 +1,6 @@
-version: '3.8'
+version: '3.9'
 services:
-  app:
+  webapisignal:
     image: fizzbuzz
     container_name: fizzbuzzbackdotnet
     ports:
@@ -8,6 +8,9 @@ services:
       - "8081:443"       # Map HTTPS port
       - "5000:5000"      # Additional ports
       - "5001:5001"
+    build:
+        context: .
+        dockerfile: Dockerfile
     environment:
       ASPNETCORE_URLS: "https://+;http://+"
       ASPNETCORE_HTTPS_PORT: 7001
@@ -20,6 +23,23 @@ services:
     networks:
       - app_network
 
+  nextapp:
+    container_name: fizzbuzzfrontnext
+    image: fooboofrontnext
+    build: 
+        context: ../fooboo-realtime-front-next/
+        dockerfile: ../fooboo-realtime-front-next/Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000           # Port inside the container
+      HOSTNAME: "0.0.0.0"  # Make the server accessible from all interfaces
+    volumes:
+        - ./certs:/app/certs:ro
+    networks:
+      - app_network
+
   mssql:
     image: mcr.microsoft.com/mssql/server:2019-latest
     container_name: mssql_db
@@ -28,6 +48,7 @@ services:
     environment:
       SA_PASSWORD: "MssqlDevelopingPass12#"
       ACCEPT_EULA: "Y"
+      MSSQL_TCP_PORT: 1433
       MSSQL_PID: "Developer" # Developer edition of MSSQL
     volumes:
       - mssql_data:/var/opt/mssql
@@ -39,3 +60,4 @@ volumes:
 
 networks:
   app_network:
+    driver: bridge  
