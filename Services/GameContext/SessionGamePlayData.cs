@@ -115,9 +115,9 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                 return ERROR;
             }
             // evaluate the answer and update the score.
-            var result = Eval(answer, _gameData[
-                                    _gamesQuestionSet[target.CurrenctQuestionIndex] // the question
-                                    ]);
+            var cachedExpectedAnswerSubStrs = _gameData[_gamesQuestionSet[target.CurrenctQuestionIndex]]; // the question
+            var result = answer.IsComposeOf(cachedExpectedAnswerSubStrs);
+
             target.CorrectCount += result ? 1 : 0;
             target.CurrenctQuestionIndex++;
             // if the player is @first place.
@@ -191,53 +191,6 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                 .Find(p => p.playerConnectionId == connectionId);
             if (target != null)
                 target.playerConnectionId = newConnectionId;
-        }
-
-        public bool Eval(string answer, string[] expectedSubStrs)
-        {
-            var expectedSubStrTotalLength = expectedSubStrs.Aggregate(0, (length, str) => length += str.Length);
-            if (answer.Length != expectedSubStrTotalLength)
-            {
-                return false;
-            }
-
-
-            return AttemptSlice(answer, expectedSubStrs);
-        }
-
-        public bool AttemptSlice(string str, string[] stringList)
-        {
-            // base case
-            var trimmedStr = str.Trim('\t');
-            if (stringList.Length == 0 && trimmedStr.Length == 0) return true;
-            if (stringList.Length != 0 && trimmedStr.Length == 0) return false;
-            if (stringList.Length == 0 && trimmedStr.Length != 0) return false;
-            var exptedStr = stringList[0];
-            if (trimmedStr.Length < exptedStr.Length)
-            {
-                return false;
-            }
-            string[] subArray = stringList.Skip(1).ToArray();
-            // construct the potential str that has str
-            List<string> potentialLeftOver = [];
-            if (str == exptedStr && subArray.Length == 0)
-                return true;
-            for (int i = 0; i < str.Length - exptedStr.Length + 1; i++)
-            {
-                var matchingStr = str.Substring(i, exptedStr.Length);
-                if (matchingStr == exptedStr)
-                {
-
-                    potentialLeftOver.Add(str[0..i] + "\t" + str[(exptedStr.Length + i)..str.Length]);
-                }
-            }
-            return potentialLeftOver.Count == 0
-                ? false // an expected sub str not found: must be false
-                : potentialLeftOver
-                // any expression tree yield a true.
-                .Aggregate(false, (predicate, cur) =>
-                    predicate || AttemptSlice(cur, subArray)
-                );
         }
     }
 }
