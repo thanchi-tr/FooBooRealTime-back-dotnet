@@ -46,6 +46,7 @@
   <ItemGroup>
     <Folder Include="Logs\" />
     <Folder Include="Services\Auth\" />
+	 <Folder Include="..\Docker\"/>
   </ItemGroup>
 
 </Project>

@@ -26,6 +26,15 @@ namespace FooBooRealTime_back_dotnet.Data
                     .WithOne(g => g.Author)
                     .HasForeignKey(g => g.AuthorId)
                     .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<Player>().HasData(
+                new Player
+                {
+                    PlayerId = new Guid("09ac5e84-db5c-4131-0d1c-08dd1c5384cf"),
+                    Name = "June"
+                }
+
+            );
         }
     }
 }

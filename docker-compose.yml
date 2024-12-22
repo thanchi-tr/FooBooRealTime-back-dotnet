@@ -1,0 +1,41 @@
+version: '3.8'
+services:
+  app:
+    image: ssldemo:v1
+    container_name: ssl_app
+    ports:
+      - "8080:80"        # Map HTTP port
+      - "8081:443"       # Map HTTPS port
+      - "5000:5000"      # Additional ports
+      - "5001:5001"
+    environment:
+      ASPNETCORE_URLS: "https://+;http://+"
+      ASPNETCORE_HTTPS_PORT: 7001
+      ASPNETCORE_Kestrel__Certificates__Default__Password: "Xuan12343@"
+      ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/dockerdemo.pfx"
+    volumes:
+      - C:\Users\thanc\.aspnet\https:/https/
+    depends_on:
+      - mssql
+    networks:
+      - app_network
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: mssql_db
+    ports:
+      - "1433:1433"
+    environment:
+      SA_PASSWORD: "MssqlDevelopingPass12#"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer" # Developer edition of MSSQL
+    volumes:
+      - mssql_data:/var/opt/mssql
+    networks:
+      - app_network
+
+volumes:
+  mssql_data:
+
+networks:
+  app_network:
