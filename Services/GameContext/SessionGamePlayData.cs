@@ -80,6 +80,13 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             Participants.Remove(target);
         }
 
+        public void ToggleParticipantReadiness(string connectionId)
+        {
+            var target = Participants.Find(p => p.playerConnectionId == connectionId);
+            if(target != null)
+                target.IsReady = !target.IsReady;
+        }
+
         public void NextState()
         {
             switch (CurrentState)

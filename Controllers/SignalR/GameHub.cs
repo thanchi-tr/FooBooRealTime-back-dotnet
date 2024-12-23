@@ -23,8 +23,6 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
             _playerService = playerService;
         }
 
-
-
         /// <summary>
         /// Connection to hub onlly occur where player is authenticated 
         /// @not implement the authentication feature
@@ -112,6 +110,8 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                 }
                 session.ToggleReady(Context.ConnectionId);
                 await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Player {Context.ConnectionId} is Toggling Ready state");
+                // also them every one the update infomation about who is ready and who is not
+                await Clients.Group(session.SessionId.ToString()).SendAsync(ClientMethods.SupplyScoreBoard, session.GetScoresBoard());
                 _logger.LogInformation($"Player {Context.ConnectionId} is Toggling Ready state");
 
             }

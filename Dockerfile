@@ -17,6 +17,7 @@ WORKDIR /src
 COPY ["FooBooRealTime-back-dotnet.csproj", "."]
 RUN dotnet restore "./FooBooRealTime-back-dotnet.csproj"
 COPY . .
+
 WORKDIR "/src/."
 RUN dotnet build "./FooBooRealTime-back-dotnet.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
@@ -29,6 +30,7 @@ RUN dotnet publish "./FooBooRealTime-back-dotnet.csproj" -c $BUILD_CONFIGURATION
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+
 ENTRYPOINT ["dotnet", "FooBooRealTime-back-dotnet.dll"]
 
 # docker command

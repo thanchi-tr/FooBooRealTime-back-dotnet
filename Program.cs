@@ -53,7 +53,6 @@ namespace FooBooRealTime_back_dotnet
             try
             {
                 Log.Information("Starting up the server...");
-
                 var app = builder.Build();
 
                 // migrate data of DBContext
