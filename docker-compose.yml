@@ -29,7 +29,7 @@ services:
         context: ../fooboo-realtime-front-next/
         dockerfile: ../fooboo-realtime-front-next/Dockerfile
     ports:
-      - "3001:3000"
+      - "3000:3000"
     environment:
       NODE_ENV: development
       PORT: 3000           # Port inside the container

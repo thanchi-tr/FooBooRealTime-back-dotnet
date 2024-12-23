@@ -30,7 +30,7 @@ namespace FooBooRealTime_back_dotnet.Configuration
                 opt =>
                 {
                     opt.EnableAnnotations(); // enable Swagger Annotation    
-                    opt.SwaggerDoc("v1", new OpenApiInfo { Title = "FooBoo Game", Version = "v1" });
+                    opt.SwaggerDoc("v1", new OpenApiInfo { Title = "FizzBuzz Game", Version = "v1" });
                     opt.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                     {
                         In = ParameterLocation.Header,

@@ -180,12 +180,12 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             if (_hubConnection != null)
             {
                 var initQuestion = GetInitialQuestion();
-                await _hubConnection.Clients.Group(SessionId.ToString()).SendAsync(ClientMethods.SupplyInitQuestion, initQuestion);
+                await _hubConnection.Clients.All.SendAsync(ClientMethods.SupplyInitQuestion, initQuestion);
             }
             await Task.Delay(gameDuration);
 
             // Notify all clients of game end
-            await _hubConnection.Clients.Group(SessionId.ToString()).SendAsync(ClientMethods.NotifyGameEnd);
+            await _hubConnection.Clients.All.SendAsync(ClientMethods.NotifyGameEnd);
 
             _gamePlayData.NextState();
 
@@ -203,7 +203,6 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                 if (participant.playerConnectionId == connectionId)
                 {
                     participant.IsReady = !participant.IsReady;
-                    _gamePlayData.ToggleParticipantReadiness(connectionId);
                     if (participant.IsReady)
                     {
                         result = true;

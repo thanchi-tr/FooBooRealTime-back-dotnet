@@ -76,14 +76,13 @@ namespace FooBooRealTime_back_dotnet
                     app.UseSwagger();
                     app.UseSwaggerUI();
                 }
-                
-                app.UseSerilogRequestLogging();
-                app.UseHttpsRedirection();
-                app.UseRouting();
-                app.UseCors("AllowSpecificOrigin");
-                app.UseCors("Allow3001");
-                app.UseAuthentication();
-                app.UseAuthorization();
+
+                app.UseSerilogRequestLogging(); // Logs all requests and responses
+                app.UseHttpsRedirection();      // Redirects HTTP to HTTPS
+                app.UseRouting();               // Matches routes to endpoints
+                app.UseCors("Allow3001");       // Applies CORS policy (choose one)
+                app.UseAuthentication();        // Validates credentials and sets User
+                app.UseAuthorization();         // Enforces access control policies
                 // Map routes and hubs
                 app.UseEndpoints(endpoints =>
                 {
