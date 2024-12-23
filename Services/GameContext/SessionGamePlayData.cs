@@ -15,18 +15,16 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
     public class SessionGamePlayData
     {
         public const int ERROR = -1;
-        private readonly object _lock = new object();
-        private Random random = new Random();
-        private IRandomIntSource _random = new RandomIntSource();
         public Dictionary<int, string> Rules { get; private set; }
-        protected int _gameRange;
         public GameState CurrentState { get; private set; } = GameState.WAITING;
+        private IRandomIntSource _random = new RandomIntSource();
+        protected int _gameRange;
 
         protected ConcurrentDictionary<int, string[]> _gameData = [];// ensure a generated number is not repeat
         protected List<int> _gamesQuestionSet = [];
         public List<PlayerScore> Participants = [];
-
         private GameDTO? _queuedChange = null;
+
         public SessionGamePlayData(
             Dictionary<int, string> rules,
             int gameRange,

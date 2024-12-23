@@ -1,4 +1,3 @@
-version: '3.9'
 services:
   webapisignal:
     image: fizzbuzz
@@ -37,6 +36,8 @@ services:
       HOSTNAME: "0.0.0.0"  # Make the server accessible from all interfaces
     volumes:
         - ./certs:/app/certs:ro
+    env_file:
+        - ../fooboo-realtime-front-next/.env.local
     networks:
       - app_network
 
