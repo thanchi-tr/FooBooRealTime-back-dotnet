@@ -5,9 +5,6 @@ using FooBooRealTime_back_dotnet.Model.GameContext;
 using FooBooRealTime_back_dotnet.Utils.Generator;
 using FooBooRealTime_back_dotnet.Utils.Validator;
 using System.Collections.Concurrent;
-using System.Linq;
-using System.Text.RegularExpressions;
-
 
 namespace FooBooRealTime_back_dotnet.Services.GameContext
 {
@@ -132,10 +129,18 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             return _gamesQuestionSet[target.CurrenctQuestionIndex];
         }
 
+        /// <summary>
+        /// First call when game start
+        /// </summary>
+        /// <returns></returns>
         public int GetInitQuestion()
         {
             foreach (var player in Participants)
             {
+                if(player.CurrenctQuestionIndex >= 0)
+                {
+                    throw new InvalidOperationException("SessionGamePlayData: GetInitQuestion is expected to be the first call of any game Loop");
+                }
                 player.CurrenctQuestionIndex++;
             }
             if (_gamesQuestionSet.Count == 0)
@@ -158,7 +163,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             //    potential = random.Next(0, _gameRange);
             //}
             //_gamesQuestionSet.Add(potential);
-            _gamesQuestionSet.Generate(_gameRange, _random);
+            _gamesQuestionSet=_gamesQuestionSet.Generate(_gameRange, _random);
             var generatedQuesiton = _gamesQuestionSet[_gamesQuestionSet.Count - 1];
 
             //List<string> solutionAnswerSubStr = [];
@@ -168,7 +173,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             //        solutionAnswerSubStr.Add(rule.Value);
             //}
             //_gameData[generatedQuesiton] = solutionAnswerSubStr.ToArray();
-            _gameData.GenerateAnswerComposition(Rules, generatedQuesiton);
+            _gameData = _gameData.GenerateAnswerComposition(Rules, generatedQuesiton);
             return generatedQuesiton;
         }
 

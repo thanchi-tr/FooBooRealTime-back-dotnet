@@ -4,6 +4,7 @@ using FooBooRealTime_back_dotnet.Model.GameContext;
 using FooBooRealTime_back_dotnet.Services.GameContext;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR.Client;
 using Newtonsoft.Json;
 using System;
 
@@ -30,20 +31,34 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         /// <returns></returns>
         public override async Task OnConnectedAsync()
         {
+            //only need to run for myself therefore hardcode the player
             var targetId = new Guid("09ac5e84-db5c-4131-0d1c-08dd1c5384cf");
+
             await base.OnConnectedAsync();
-            _logger.LogWarning($"Connection establish: ConnectionID: {Context.ConnectionId}");
+
+            _logger.LogInformation($"Connection Request: requestor ConnectionID: {Context.ConnectionId}");
             SessionPlayer? sessionPlayer = await SessionPlayer.CreateAsync(targetId, Context.ConnectionId, _playerService);
             if (sessionPlayer == null)
             {
-                await Clients.Caller.SendAsync(ClientMethods.NotifyError, "Please Login in");
-                return;
+                _logger.LogWarning($"Connection Reject: ConnectionID: {Context.ConnectionId} is not authorized");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyError, "Error when attempt to connect to hub.");
+                throw new HubException("Unauthorized: Only authenticated player is allow to conenct");
             }
             _gameMaster.OnPlayerConnect(Context.ConnectionId, sessionPlayer);
-            _logger.LogWarning($"Connection established: Notify {Context.ConnectionId} About the event.");
-            await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, "Player connect to pool");
+            _logger.LogInformation($"Connection established: Notify {Context.ConnectionId} About the event.");
+            await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, "Connection Establish");
         }
-
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            await base.OnDisconnectedAsync(exception);
+            if (exception == null)
+            {
+                _logger.LogInformation($"Player with Id:{Context.ConnectionId} is Disconnect");
+                return;
+            }
+            
+            _logger.LogError($"Hub:OnDisconnectedAsync: Err: {exception?.Message}");
+        }
         /// <summary>
         /// Attempt to join a session with id (supplied)
         /// </summary>
@@ -53,21 +68,44 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         {
             try
             {
+                _logger.LogInformation($"Connection Id: {Context.ConnectionId} Request to Join Session: {sessionIdStr}");
                 var sessionId = new Guid(sessionIdStr);
-
                 var activeSession = _gameMaster.RetrieveSession(sessionId);
-                if (activeSession != null)
-                {
-                    activeSession.Join(_gameMaster.GetActivePlayerDetail(Context.ConnectionId));
 
-                    await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Player is connect to Room {sessionIdStr}");
-                    await Clients.Caller.SendAsync(ClientMethods.SupplySessionInfo, activeSession.GameName, activeSession.GetRules());
-                    await Groups.AddToGroupAsync(Context.ConnectionId, sessionIdStr);
+                if (activeSession == null)
+                {
+                    throw new HubException($"Connection Id:{Context.ConnectionId} Attempt to access non existed Session");
                 }
+
+                var actionResult = activeSession.Join(_gameMaster.GetActivePlayerDetail(Context.ConnectionId));
+                if(actionResult)
+                {
+                    await Groups.AddToGroupAsync(Context.ConnectionId, sessionIdStr);
+                    await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Successful: Player is connected to Room {sessionIdStr}");
+                    await Clients.Caller.SendAsync(ClientMethods.SupplySessionInfo, activeSession.GameName, activeSession.GetRules());
+                    _logger.LogInformation($"Granted: Request by Connection Id: {Context.ConnectionId} is Successful");
+                }
+                else
+                {
+                    await Clients.Caller.SendAsync(ClientMethods.NotifyError, $"Failure:Room {sessionIdStr} reject player connection");
+                    _logger.LogInformation($"Reject: Request by Connection Id: {Context.ConnectionId} is unsuccessful");
+                }
+                
+            }
+            catch (FormatException ex)
+            {
+                _logger.LogWarning($"Invalid session Id format: {sessionIdStr}. Error: {ex.Message}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyError, "Invalid session ID format.");
+            }
+            catch (HubException ex)
+            {
+                _logger.LogWarning($"Hub exception: {ex.Message}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyError, ex.Message);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"SignalR: catch invalid sessionId{ex}");
+                _logger.LogError($"An unexpected error occurred: {ex}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyError, "An unexpected error occurred.");
             }
         }
 
@@ -83,20 +121,24 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                 var session = _gameMaster.GetSessionOf(Context.ConnectionId);
                 if (session == null)
                 {
-                    await Clients.Caller.SendAsync(ClientMethods.NotifyError, "Player is not in a session");
-                    return;
+                    throw new HubException("Un-authorized action:Attempt to call Hub.SendAnswer outside of session scope");
                 }
-                session?.ProcessAnswer(Context.ConnectionId, answer);
+                await session.ProcessAnswer(Context.ConnectionId, answer);
+                _logger.LogInformation($"Player with connectionId {Context.ConnectionId} Has made an answer submission");
+            }
+            catch (HubException ex)
+            {
+                _logger.LogWarning($"Hub exception: {ex.Message}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyError, ex.Message);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"SignalR: catch {ex}");
+                _logger.LogError($"SignalR: catch unexpected {ex}");
             }
-            return;
         }
 
         /// <summary>
-        /// 
+        /// Toggle player state, if they have a session
         /// </summary>
         public async Task TogglePlayerReady()
         {
@@ -105,15 +147,15 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                 var session = _gameMaster.GetSessionOf(Context.ConnectionId);
                 if (session == null)
                 {
-                    await Clients.Caller.SendAsync(ClientMethods.NotifyError, "Player is not in a session");
-                    return;
+                    throw new HubException("Un-authorized action:Attempt to call Hub.TogglePlayerReady outside of session scope");
                 }
-                session.ToggleReady(Context.ConnectionId);
-                await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Player {Context.ConnectionId} is Toggling Ready state");
-                // also them every one the update infomation about who is ready and who is not
-                //await Clients.All.SendAsync(ClientMethods.SupplyScoreBoard, session.GetScoresBoard());
-                _logger.LogInformation($"Player {Context.ConnectionId} is Toggling Ready state");
+                await session.ToggleReady(Context.ConnectionId);
 
+            }
+            catch (HubException ex)
+            {
+                _logger.LogWarning($"Hub exception: {ex.Message}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyError, ex.Message);
             }
             catch (Exception ex)
             {
@@ -121,6 +163,11 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
             }
         }
 
+        /// <summary>
+        /// Game context: is the Domain data of the game. Session drawn on these data to allow
+        /// a runnable version.
+        /// </summary>
+        /// <returns></returns>
         public async Task RequestAvailableGameContexts()
         {
             try
@@ -130,7 +177,7 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
             }
             catch (Exception ex)
             {
-                _logger.LogError($"SignalR: catch {ex}");
+                _logger.LogError($"SignalR: catch Unexpected {ex}");
             }
         }
 
@@ -139,9 +186,7 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
             try
             {
                 var availableSessions = _gameMaster.RetrieveActiveSession();
-
-                // trigger client RPC to supply the available session
-                _logger.LogWarning($"Request Successfull: Grant {Context.ConnectionId} Infomation of Sessions with type {availableSessions.GetType()}.");
+                _logger.LogInformation($"Request Successfull: Grant {Context.ConnectionId} Infomation of Sessions with type {availableSessions.GetType()}.");
                 await Clients.Caller.SendAsync(ClientMethods.SupplyAvailableSessions, availableSessions);
             }
             catch (Exception ex)
@@ -160,14 +205,18 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                 var session = _gameMaster.GetSessionOf(Context.ConnectionId);
                 if (session == null)
                 {
-                    await Clients.Caller.SendAsync(ClientMethods.NotifyError, "Player is not in a session");
-                    return;
+                    throw new HubException("Un-authorized action:Attempt to call Hub.RequestScoreBoard outside of session scope");
                 }
                 var scoreBoard = session?.GetScoresBoard();
 
 
                 // trigger client RPC to supply the score board
-                 await Clients.Caller.SendAsync(ClientMethods.SupplyScoreBoard, scoreBoard);
+                await Clients.Caller.SendAsync(ClientMethods.SupplyScoreBoard, scoreBoard);
+            }
+            catch (HubException ex)
+            {
+                _logger.LogWarning($"Hub exception: {ex.Message}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyError, ex.Message);
             }
             catch (Exception ex)
             {
@@ -183,32 +232,59 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         /// <param name="contextNameId"></param>
         public async Task RequestNewSession(string contextNameId)
         {
-            var playerSessionDetail = _gameMaster.GetActivePlayerDetail(Context.ConnectionId);
-            GameSession? newSession = await _gameMaster.CreateSessionFromContext(contextNameId, playerSessionDetail);
-
-            // trigger client and supply them with the new session
-            if (newSession == null)
+            try
             {
-                await Clients.Caller.SendAsync(ClientMethods.NotifyError, "Invalid game name");
-                return;
+                var playerSessionDetail = _gameMaster.GetActivePlayerDetail(Context.ConnectionId);
+
+                GameSession newSession = await _gameMaster.CreateSessionFromContext(contextNameId, playerSessionDetail);
+
+                // trigger client and supply them with the new session
+                if (newSession == null)
+                {
+                    throw new HubException("Fail Attempt: cant initiate session.");
+                }
+                _logger.LogInformation($"Request Successfull: Grant {Context.ConnectionId} access to the Created Session {newSession.SessionId}.");
+                _logger.LogInformation($"Sending session: {JsonConvert.SerializeObject(newSession)}");
+                await Clients.Caller.SendAsync(ClientMethods.SupplySession, newSession);
             }
-            _logger.LogWarning($"Request Successfull: Grant {Context.ConnectionId} access to Created Session {newSession.SessionId}.");
-            _logger.LogInformation($"Sending session: {JsonConvert.SerializeObject(newSession)}");
-            await Clients.Caller.SendAsync(ClientMethods.SupplySession, newSession);
+            catch (HubException ex)
+            {
+                _logger.LogWarning($"Hub exception: {ex.Message}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyError, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"SignalR: catch {ex}");
+            }
         }
 
-        public async Task SupplyGameTime (int  gameTime)
+        public async Task SupplyGameTime(int gameTime)
         {
-            var playerSessionDetail = _gameMaster.GetActivePlayerDetail(Context.ConnectionId);
-            var targetSession = _gameMaster.GetSessionOf(Context.ConnectionId);
-            if (targetSession != null)
+            try
             {
-                targetSession.SetGameDurationMinute(gameTime, Context.ConnectionId);
-                await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Player {Context.ConnectionId} is setting Game time to {gameTime} min of Session {targetSession.SessionId}");
-                _logger.LogInformation($"Player {Context.ConnectionId} is setting Game time to {gameTime} min");
-                return;
+                var playerSessionDetail = _gameMaster.GetActivePlayerDetail(Context.ConnectionId);
+                var targetSession = _gameMaster.GetSessionOf(Context.ConnectionId);
+                if (targetSession == null)
+                {
+                    throw new HubException("Un-authorized action:Attempt to call Hub.SupplyGameTime outside of session scope");
+                }
+                _logger.LogInformation($"Player with connectionId {Context.ConnectionId} request to chagne session: {targetSession.SessionId} time to {gameTime} min");
+
+                var actionResult = await targetSession.SetGameDurationMinute(gameTime, Context.ConnectionId);
+                if(!actionResult)
+                {
+                    throw new HubException("Un-authorized action:Player is prohibit to alter session context.");
+                }    
             }
-            _logger.LogInformation($"Player {Context.ConnectionId} is unauthorise to set Game time of Session {targetSession.SessionId}");
+            catch (HubException ex)
+            {
+                _logger.LogWarning($"Hub exception: {ex.Message}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyError, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"SignalR: catch {ex}");
+            }
 
         }
 
@@ -217,7 +293,7 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         /// Handle when player call to leave their respected session
         /// </summary>
         /// <returns></returns>
-        public void LeftSession()
+        public async Task LeftSession()
         {
             _logger.LogInformation($"Player:: {Context.ConnectionId} request to leave their Current Game Session");
             // delegate task to the game master
@@ -225,7 +301,9 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
 
             // we can decide if we want to notify all player in this group that player left
             // for now do nothing
-            _logger.LogInformation($"Player:: {Context.ConnectionId} is expelled from Session: {sessionId}");
+            _logger.LogInformation($"Player:: {Context.ConnectionId} is expelled from Session: {sessionId}"); 
+            await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Player {Context.ConnectionId} is expell");
+
         }
     }
 }

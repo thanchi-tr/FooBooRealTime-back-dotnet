@@ -13,7 +13,7 @@ namespace FooBooRealTime_back_dotnet.Utils.Generator
         /// </summary>
         /// <param name="questionSet"></param>
         /// <param name="Rules"></param>
-        public static void Generate(this List<int> questionSet,
+        public static List<int> Generate(this List<int> questionSet,
                 int questionBoundary,
                 IRandomIntSource randomSource)
         {
@@ -23,6 +23,7 @@ namespace FooBooRealTime_back_dotnet.Utils.Generator
                 potential = randomSource.Generate(questionBoundary);
             }
             questionSet.Add(potential);
+            return questionSet;
         }
     }
 }

@@ -13,14 +13,13 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
 {
     public class GameMaster : IGameMaster
     {
-        private readonly ConcurrentDictionary<string, Game> _gameContexts = [];
+        private readonly ConcurrentDictionary<string, Game> _gameContexts = []; // Domain data
         private readonly ConcurrentDictionary<Guid, GameSession> _activeSession = [];
-        private readonly ILogger<IGameMaster> _logger;
-        private readonly IServiceProvider _serviceProvider;
-
         private readonly ConcurrentDictionary<string, SessionPlayer> _activePlayers = [];
         private readonly ConcurrentDictionary<string, GameSession> _playerSessions = [];
 
+        private readonly ILogger<IGameMaster> _logger;
+        private readonly IServiceProvider _serviceProvider;
         public GameMaster(IServiceProvider serviceProvider, ILogger<IGameMaster> logger)
         {
             _serviceProvider = serviceProvider;
@@ -32,10 +31,31 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             return _activePlayers[connectionId];
         }
 
+        
+        /// <summary>
+        /// Handling mapping player (when their connection alter) or create new record
+        /// </summary>
+        /// <param name="connectionId"></param>
+        /// <param name="player"></param>
         public void OnPlayerConnect(string connectionId, SessionPlayer player)
         {
+            if (_activePlayers.ContainsKey(connectionId))
+            {
+                return;
+            }
+                // attempt to see if the player is re-connect using a different connectionId
+                var target = _activePlayers.FirstOrDefault(kvp => kvp.Value.InternalId == player.InternalId);
+
+            // Remap the new connectionId
+            if(!target.Equals(default(KeyValuePair<string, SessionPlayer>)))
+            {
+                var actionResult = _activePlayers.TryRemove(target);
+                if (!actionResult)
+                    _logger.LogError("Unexpect behaviour raise : (fail to delete predecated connection Player map)");
+            }
             _activePlayers[connectionId] = player;
         }
+
 
         public async Task<string[]> RetrieveAllGames()
         {
@@ -44,7 +64,6 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                 using (var scope = _serviceProvider.CreateScope())
                 {
                     var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
-
                     var games = await gameService.GetAllAsync();
 
                     return games.Select(g => g.GameId).ToArray();
@@ -52,6 +71,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             }
             catch (Exception ex)
             {
+                _logger.LogWarning($"Retrieve all games- fail: {ex}");
                 return Array.Empty<string>();
             }
         }
@@ -64,33 +84,46 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         /// <param name="nameId"></param>
         /// <param name="host"></param>
         /// <returns></returns>
-        public async Task<GameSession?> CreateSessionFromContext(string nameId, SessionPlayer host)
+        public async Task<GameSession> CreateSessionFromContext(string nameId, SessionPlayer host)
         {
-            using (var scope = _serviceProvider.CreateScope()) // retrieve the Hub 
+            try
             {
-                var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<GameHub>>();
+                using (var scope = _serviceProvider.CreateScope()) // retrieve the Hub 
+                {
+                    var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<GameHub>>();
+                    var context = await GetContext(nameId);
 
-                var context = await GetContext(nameId);
-                Console.WriteLine(context);
-                if (context == null || context.Rules.Extract() == null)
-                    return null;
+                    if (context == null || context.Rules.Extract() == null)
+                        throw new HubException("CreateSessiomFromContext: Fail- Game with name {nameId} does not exist");
 
-                var sessionGameData = new SessionGamePlayData(
-                        context.Rules.Extract(),
-                        context.Range,
-                        host.ConnectionId
-                    );
+                    if (host.ConnectionId == null)
+                    {
+                        throw new HubException("CreateSessiomFromContext: Fail- requestor's connectionId is invalid");
+                    }
 
-                var newSession = new GameSession(
-                        hubContext,
-                    host,
-                    sessionGameData,
-                    nameId);
-                _activeSession[newSession.SessionId] = newSession;
-                context.Subscribe(newSession);
-                _playerSessions[host.ConnectionId] = newSession;
-                return newSession;
+                    var sessionGameData = new SessionGamePlayData(
+                            context.Rules.Extract() ?? new Dictionary<int, string>(),
+                            context.Range,
+                            host.ConnectionId
+                        );
+                    var newSession = new GameSession(
+                            hubContext,
+                        host,
+                        sessionGameData,
+                        nameId);
+
+
+                    context.Subscribe(newSession); // alow session to react to change in the game.
+                    _activeSession[newSession.SessionId] = newSession;
+                    _playerSessions[host.ConnectionId] = newSession;
+                    return newSession;
+                }
             }
+            catch // forward the error to upper level
+            {
+                throw;
+            }
+            
         }
 
         public GameSession? GetSessionOf(string connectionId)
@@ -131,13 +164,18 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                     var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
 
                     target = await gameService.GetByIdAsync(nameId);
+                    if(target == null || String.IsNullOrEmpty(target.GameId))
+                    {
+                        throw new ArgumentException($"GameMast:GetContext: namedId with value {nameId} does not exist in system");
+                    }
+#pragma warning disable CS8602 // Dereference of a possibly null reference., it should not be zero
                     _gameContexts[target.GameId] = target;
-                    _logger.LogInformation($"Game Master: Cache missed, load {target.GameId} into Game master");
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
+                    _logger.LogInformation($"Game Master: Cache missed, load <{target.GameId}> into Game master's cache");
 
                     return target;
                 }
             }
-            Console.WriteLine(target);
             return target;
         }
 

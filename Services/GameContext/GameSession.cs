@@ -3,6 +3,8 @@ using FooBooRealTime_back_dotnet.Interface.GameContext;
 using FooBooRealTime_back_dotnet.Model.DTO;
 using FooBooRealTime_back_dotnet.Model.GameContext;
 using Microsoft.AspNetCore.SignalR;
+using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace FooBooRealTime_back_dotnet.Services.GameContext
@@ -11,7 +13,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
     {
 
         const int NOT_SET = -1;
-        private readonly IHubContext<GameHub>? _hubConnection;
+        private readonly IHubContext<GameHub> _hubConnection;
 
         private object _lock = new object();
         public Guid SessionId { get; set; } = Guid.NewGuid();
@@ -53,7 +55,6 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                     _participants.Add(player);
 
             }
-
             return actionResult;
         }
 
@@ -66,7 +67,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         {
             var target = _participants.Find(p => p.ConnectionId == participantConnectionId);
 
-            if (target == null)
+            if (target == null || target.ConnectionId == null)
                 return; // target is not in this session
 
             _gamePlayData.EraseDataOf(target.ConnectionId);
@@ -88,7 +89,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         {
             var target = _participants
                         .Find(p => p.ConnectionId == playerConnectionId);
-            if (target == null)
+            if (target != null)
                 target.IsConnected = false;
         }
 
@@ -117,14 +118,14 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         /// </summary>
         /// <param name="durationInMinute"></param>
         /// <param name="hostId"></param>
-        public async void SetGameDurationMinute(double durationInMinute, string hostId)
+        public async Task<Boolean> SetGameDurationMinute(double durationInMinute, string hostId)
         {
             if (_host.ConnectionId != hostId)
             {
                 await _hubConnection
                         .Clients.Client(hostId)
                         .SendAsync(ClientMethods.NotifyError, "Attempt to patch un-authorised material");
-                return;
+                return false;
             }
             if(_gamePlayData.CurrentState != GameState.PLAYING)
             {
@@ -137,8 +138,10 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             if (_gamePlayData.CurrentState != GameState.PLAYING)
             {
                 _gameDurationInMinute = durationInMinute;
+                await _hubConnection.Clients.All.SendAsync(ClientMethods.SupplyGameTime, durationInMinute);
                 AttemptToStart();
             }
+            return true;
         }
 
         public GameState State() => _gamePlayData.CurrentState;
@@ -153,7 +156,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         /// <returns></returns>
         /// 
 
-        public async Task AttemptToStart()
+        public void AttemptToStart()
         {
             if (_gameDurationInMinute <= 0 || _gamePlayData.CurrentState != GameState.WAITING)
                 return;
@@ -162,10 +165,19 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                 if (!participant.IsReady)
                     return;
             }
-            _gamePlayData.NextState();
+            var waitFlag = true;
             // let the game loop continue in the back ground
-            await StartGameLoopAsync();
-            return;
+            try
+            {
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+                // i want the game loop to run in the back ground and free the server.
+                StartGameLoopAsync();
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+            }
+            catch
+            {
+                throw;
+            }
         }
 
         /// <summary>
@@ -174,30 +186,35 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         /// <returns></returns>
         private async Task StartGameLoopAsync()
         {
-            var startTime = DateTime.Now;
-            TimeSpan gameDuration = TimeSpan.FromMinutes((int)(_gameDurationInMinute));
-
-            if (_hubConnection != null)
+            try
             {
+                var startTime = DateTime.Now;
+                TimeSpan gameDuration = TimeSpan.FromMinutes((int)(_gameDurationInMinute));
+                if (_hubConnection == null)
+                {
+                    throw new HubException("GameSession: Hub reference is missing");
+                }                
+                _gamePlayData.NextState(); // game loop is about to start
                 var initQuestion = GetInitialQuestion();
                 await _hubConnection.Clients.All.SendAsync(ClientMethods.SupplyInitQuestion, initQuestion);
+                await Task.Delay(gameDuration);
+                // Notify all clients of game end
+                await _hubConnection.Clients.All.SendAsync(ClientMethods.NotifyGameEnd);
+                _gamePlayData.NextState();
+            }catch { 
+                throw; 
             }
-            await Task.Delay(gameDuration);
-
-            // Notify all clients of game end
-            await _hubConnection.Clients.All.SendAsync(ClientMethods.NotifyGameEnd);
-
-            _gamePlayData.NextState();
-
+                    
         }
 
         /// <summary>
         /// </summary>
         /// <param name="connectionId"></param>
         /// <returns></returns>
-        public Boolean ToggleReady(string connectionId)
+        public async Task<Boolean> ToggleReady(string connectionId)
         {
             var result = false;
+            var playerState = false; // default
             foreach (var participant in _gamePlayData.Participants)
             {
                 if (participant.playerConnectionId == connectionId)
@@ -207,8 +224,14 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                     {
                         result = true;
                     }
+                    playerState = participant.IsReady;
+                    break;
                 }
             }
+            var readyStateStr = (playerState) ? "Ready" : "Idling";
+            await _hubConnection.Clients.Client(connectionId).SendAsync(ClientMethods.NotifyEvent, $"Player {connectionId} is {readyStateStr}");
+            // @the group sending is having trouble, opt to the all instead.
+            await _hubConnection.Clients.All.SendAsync(ClientMethods.NotifyReadyStatesChange, _gamePlayData.Participants); 
             AttemptToStart(); // if this player is the last in the room
             return result;
         }
@@ -222,7 +245,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         public async Task<int> ProcessAnswer(string connectionId, string answer)
         {
             var result = _gamePlayData.SubmitAnswer(connectionId, answer);
-            Console.WriteLine(result);
+            
             if(result < 0)
             {
                 await _hubConnection.Clients.Client(connectionId).SendAsync(ClientMethods.NotifyError, $"Attempt to submit answer where there are no game loop");
@@ -232,9 +255,21 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             return result;
         }
 
+        /// <summary>
+        /// This method is only accessible during the initial phase,
+        /// as a signal where a new game loop is started.
+        /// attempt to call any other place will result in an exception
+        /// </summary>
+        /// <returns></returns>
         public int GetInitialQuestion()
         {
-            return _gamePlayData.GetInitQuestion();
+            try
+            {
+                return _gamePlayData.GetInitQuestion();
+            } catch
+            {
+                throw;
+            }
         }
         public PlayerScore[] GetScoresBoard() => _gamePlayData.Participants.ToArray();
 

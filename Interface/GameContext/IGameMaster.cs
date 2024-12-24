@@ -10,7 +10,7 @@ namespace FooBooRealTime_back_dotnet.Interface.GameContext
         public void Refresh(GameDTO changes);
         public Task<Game?> GetContext(string nameId);
 
-        public Task<GameSession?> CreateSessionFromContext(string nameId, SessionPlayer host);
+        public Task<GameSession> CreateSessionFromContext(string nameId, SessionPlayer host);
 
 
         public GameSession? RetrieveSession(Guid sessionId);
