@@ -39,6 +39,21 @@ namespace FooBooRealTime_back_dotnet.Controllers
                     Created(nameof(gameDetail), target);
 
         }
+        [HttpPatch("Players/{playerId}/Games/{gameId}")]
+        [SwaggerOperation(
+            Summary = "Update an Game using its ID as key",
+            Description = "Fetches the Store details if the item exists, Then update it."
+        )]
+        [ProducesResponseType(typeof(Game), StatusCodes.Status201Created)] // Specifies the response type for 200 OK
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)] // Specifies a 404 Not Found response
+        public async Task<IActionResult> Delete([FromBody] GameDTO gameDetail, Guid playerId, string gameId)
+        {
+            gameDetail.AuthorId = playerId;
+            var result = await _gameService.UpdateAsync(gameDetail, gameId);
+            return (result != null)
+                    ? NoContent()
+                    : Unauthorized("Requestor is not authorised to delete the resource");
+        }
 
         [HttpDelete("Players/{playerId}/Games/{gameId}")]
         [SwaggerOperation(

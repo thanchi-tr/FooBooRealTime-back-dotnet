@@ -15,7 +15,7 @@ namespace FooBooRealTime_back_dotnet.Configuration
             // register the db context
             services.AddDbContext<FooBooDbContext>(
                 options => options.UseSqlServer(
-                    configuration.GetConnectionString("FooBooStr"),
+                    configuration.GetConnectionString("FooBooStrLocal"),
                     sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
                         maxRetryCount: 5,             // Number of retries
                         maxRetryDelay: TimeSpan.FromSeconds(5), // Delay between retries
