@@ -69,14 +69,27 @@ namespace FooBooRealTime_back_dotnet.Configuration
                 {
                     options.Authority = authority;
                     options.Audience = audience;
-                    options.TokenValidationParameters = new TokenValidationParameters
+                    options.Events = new JwtBearerEvents
                     {
-                        ValidateIssuer = true,
-                        ValidateAudience = true,
-                        ValidateLifetime = true,
-                        ValidIssuer = authority,
-                        ValidAudience = audience
+                        OnMessageReceived = context =>
+                        {
+                            // Log the token for debugging purposes
+                            Console.WriteLine($"Token received: {context.Token}");
+
+                            // Allow SignalR access token from query string
+                            var accessToken = context.Request.Query["access_token"];
+                            var path = context.HttpContext.Request.Path;
+
+                            // Check if the request is for your SignalR hub
+                            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hub/game"))
+                            {
+                                context.Token = accessToken;
+                            }
+
+                            return Task.CompletedTask;
+                        }
                     };
+
                 });
             services
               .AddAuthorization(options =>
@@ -84,14 +97,14 @@ namespace FooBooRealTime_back_dotnet.Configuration
                   options.AddPolicy(
                     "read:user-profile",
                     policy => policy.Requirements.Add(
-                      new HasScopeRequirement("read:user-profile", "https://dev-fsnd12345.us.auth0.com/")
+                      new HasScopeRequirement("read:user-profile", "https://dev-llzbopidy6i26kov.us.auth0.com")
                     )
                   );
 
                   options.AddPolicy(
                     "delete:user",
                     policy => policy.Requirements.Add(
-                      new HasScopeRequirement("delete:user", "https://dev-fsnd12345.us.auth0.com/")
+                      new HasScopeRequirement("delete:user", "https://dev-llzbopidy6i26kov.us.auth0.com")
                     )
                   );
               });

@@ -10,7 +10,7 @@ using System;
 
 namespace FooBooRealTime_back_dotnet.Controllers.SignalR
 {
-    //[Authorize]
+    [Authorize]
     public class GameHub : Hub
     {
         private IGameMaster _gameMaster;

@@ -15,7 +15,7 @@
                 });
                 options.AddPolicy("Allow3001", policy =>
                 {
-                    policy.WithOrigins("http://localhost:3001", "https://localhost:3001", "https://localhost:3000", "http://localhost:3000") // Allow your frontend origin
+                    policy.WithOrigins("http://localhost:3000") // Allow your frontend origin
                           .AllowAnyMethod() // Allow any HTTP method (GET, POST, etc.)
                           .AllowAnyHeader() // Allow any headers (e.g., Content-Type, Authorization)
                           .AllowCredentials(); // If you need cookies or authorization headers

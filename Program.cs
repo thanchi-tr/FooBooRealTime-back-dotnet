@@ -87,7 +87,12 @@ namespace FooBooRealTime_back_dotnet
                 app.UseEndpoints(endpoints =>
                 {
                     endpoints.MapControllers();
-                    endpoints.MapHub<GameHub>("hub/game");
+                    endpoints.MapHub<GameHub>("hub/game",options =>
+                    {
+                        options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets |
+                                             Microsoft.AspNetCore.Http.Connections.HttpTransportType.ServerSentEvents |
+                                             Microsoft.AspNetCore.Http.Connections.HttpTransportType.LongPolling;
+                    });
                 });
                 Log.Information("Server successfully started");
                 app.Run();

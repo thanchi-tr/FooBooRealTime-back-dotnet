@@ -11,7 +11,7 @@ namespace FooBooRealTime_back_dotnet.Controllers
     /// </summary>
     [ApiController]
     [Route("Api/Players/")]
-    //[Authorize]
+    [Authorize]
     public class PlayerController : ControllerBase
     {
         private readonly ILogger<IPlayerService> _logger;
@@ -43,6 +43,7 @@ namespace FooBooRealTime_back_dotnet.Controllers
         }
 
         [HttpGet("")]
+        [Authorize]
         public async Task<IActionResult> GetAll()
         {
             return Ok(await _playerService.GetAllAsync());

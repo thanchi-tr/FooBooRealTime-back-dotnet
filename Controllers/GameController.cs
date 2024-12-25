@@ -9,7 +9,7 @@ namespace FooBooRealTime_back_dotnet.Controllers
 {
     [ApiController]
     [Route("Api/")]
-    //[Authorize]
+    [Authorize]
     public class GameController : ControllerBase
     {
         private readonly ILogger<IGameService> _logger;
