@@ -26,8 +26,10 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             _logger = logger;
         }
 
-        public SessionPlayer GetActivePlayerDetail(string connectionId)
+        public SessionPlayer? GetActivePlayerDetail(string connectionId)
         {
+            if (!_activePlayers.ContainsKey(connectionId))
+                return null;
             return _activePlayers[connectionId];
         }
 
@@ -128,6 +130,8 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
 
         public GameSession? GetSessionOf(string connectionId)
         {
+            if(!_playerSessions.ContainsKey(connectionId))
+                return null;
             return _playerSessions[connectionId];
         }
 
@@ -137,6 +141,8 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         }
         public GameSession[]? RetiveSessionsByContextName(string nameId)
         {
+            if (!_gameContexts.ContainsKey(nameId))
+                return [];
 
             var observers = _gameContexts[nameId].GetObservers();
             return (GameSession[])observers.Where(o => o.GetType() == typeof(GameSession)).ToArray();
@@ -144,6 +150,8 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         }
         public GameSession? RetrieveSession(Guid sessionId)
         {
+            if (!_activeSession.ContainsKey(sessionId))
+                return null;
             return _activeSession[sessionId];
         }
 
@@ -180,7 +188,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         }
 
 
-        public Guid? OnPlayerLeftSession(string requestorConnectionId)
+        public GameSession? OnPlayerLeftSession(string requestorConnectionId)
         {
             // Each player can be connect to one session at a time,
             var requestorSession = _playerSessions[requestorConnectionId];
@@ -195,11 +203,23 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                 _activeSession.Remove(requestorSession.SessionId, out var disposedSession);
                 _logger.LogInformation($"Session: {requestorSession.SessionId} is Dead and Disposed");
             }
-            return requestorSession.SessionId;
+            return requestorSession;
 
         }
 
-
+        public void CachePlayerSession(string playerConnectionId, Guid sessionId)
+        {
+            if(!_activeSession.ContainsKey(sessionId) ||
+                !_activePlayers.ContainsKey(playerConnectionId))
+            {
+                return;
+            }
+            var session = _activeSession[sessionId];
+            if(!_playerSessions.ContainsKey(playerConnectionId))
+            {
+                _playerSessions[playerConnectionId] = session;
+            }
+        }
         public void Refresh(GameDTO changes)
         {
             throw new NotImplementedException();

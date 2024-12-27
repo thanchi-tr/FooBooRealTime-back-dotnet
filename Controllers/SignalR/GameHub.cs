@@ -1,7 +1,9 @@
 ﻿using FooBooRealTime_back_dotnet.Interface.GameContext;
 using FooBooRealTime_back_dotnet.Interface.Service;
 using FooBooRealTime_back_dotnet.Model.GameContext;
+using FooBooRealTime_back_dotnet.Services.ExternalApi;
 using FooBooRealTime_back_dotnet.Services.GameContext;
+using FooBooRealTime_back_dotnet.Utils.Generator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -16,9 +18,9 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         private IGameMaster _gameMaster;
         private readonly ILogger<GameHub> _logger;
         private readonly IPlayerService _playerService;
-
-        public GameHub(IGameMaster gameMaster, ILogger<GameHub> logger, IPlayerService playerService)
-        {
+        private readonly ExternalApiService _externalApiService;
+        public GameHub(IGameMaster gameMaster, ILogger<GameHub> logger, IPlayerService playerService, ExternalApiService externalApiService) {
+            _externalApiService = externalApiService;
             _gameMaster = gameMaster;
             _logger = logger;
             _playerService = playerService;
@@ -31,9 +33,11 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         /// <returns></returns>
         public override async Task OnConnectedAsync()
         {
-            //only need to run for myself therefore hardcode the player
-            var targetId = new Guid("09ac5e84-db5c-4131-0d1c-08dd1c5384cf");
-
+            Console.WriteLine(Context?.User?.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value);
+#pragma warning disable CS8604 // Possible null reference argument.
+            Guid targetId = Context.ToGuidId();
+#pragma warning restore CS8604 // Possible null reference argument.
+            Console.WriteLine(targetId);
             await base.OnConnectedAsync();
 
             _logger.LogInformation($"Connection Request: requestor ConnectionID: {Context.ConnectionId}");
@@ -56,9 +60,16 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                 _logger.LogInformation($"Player with Id:{Context.ConnectionId} is Disconnect");
                 return;
             }
-            
+
             _logger.LogError($"Hub:OnDisconnectedAsync: Err: {exception?.Message}");
         }
+
+        public async Task RequestConnectionId()
+        {
+            _logger.LogInformation($"====================================================================================");
+            await Clients.Caller.SendAsync(ClientMethods.SupplyConnectionId, Context.ConnectionId);
+        }
+
         /// <summary>
         /// Attempt to join a session with id (supplied)
         /// </summary>
@@ -76,21 +87,27 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                 {
                     throw new HubException($"Connection Id:{Context.ConnectionId} Attempt to access non existed Session");
                 }
-
+                
+                
                 var actionResult = activeSession.Join(_gameMaster.GetActivePlayerDetail(Context.ConnectionId));
-                if(actionResult)
+                _gameMaster.CachePlayerSession(Context.ConnectionId, sessionId);
+                if (actionResult)
                 {
-                    await Groups.AddToGroupAsync(Context.ConnectionId, sessionIdStr);
+                    await Groups.AddToGroupAsync(Context.ConnectionId, activeSession.SessionId.ToString());
                     await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Successful: Player is connected to Room {sessionIdStr}");
-                    await Clients.Caller.SendAsync(ClientMethods.SupplySessionInfo, activeSession.GameName, activeSession.GetRules());
+                    await Clients.Caller.SendAsync(ClientMethods.SupplySessionInfo, activeSession.GameName, activeSession.GetRules(), activeSession.GetHost(), activeSession.GetGameDurationMinute());
+                    await Clients.Group(activeSession.SessionId.ToString()).SendAsync(ClientMethods.NotifyReadyStatesChange, activeSession.GetScoresBoard());
                     _logger.LogInformation($"Granted: Request by Connection Id: {Context.ConnectionId} is Successful");
+                    _logger.LogInformation($"Session {activeSession.SessionId}: Contains {activeSession.GetScoresBoard().Select(
+                            player => new { ConnectionId = player.playerConnectionId, State=player.IsReady}
+                        )}");
                 }
                 else
                 {
                     await Clients.Caller.SendAsync(ClientMethods.NotifyError, $"Failure:Room {sessionIdStr} reject player connection");
                     _logger.LogInformation($"Reject: Request by Connection Id: {Context.ConnectionId} is unsuccessful");
                 }
-                
+
             }
             catch (FormatException ex)
             {
@@ -243,9 +260,14 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                 {
                     throw new HubException("Fail Attempt: cant initiate session.");
                 }
+                await Groups.AddToGroupAsync(Context.ConnectionId, newSession.SessionId.ToString());
                 _logger.LogInformation($"Request Successfull: Grant {Context.ConnectionId} access to the Created Session {newSession.SessionId}.");
                 _logger.LogInformation($"Sending session: {JsonConvert.SerializeObject(newSession)}");
                 await Clients.Caller.SendAsync(ClientMethods.SupplySession, newSession);
+                await Clients.Group(newSession.SessionId.ToString()).SendAsync(ClientMethods.NotifyReadyStatesChange, newSession.GetScoresBoard());
+
+                // notify every one about the newly create game session
+                await Clients.All.SendAsync(ClientMethods.SupplyAvailableSessions, _gameMaster.RetrieveActiveSession());
             }
             catch (HubException ex)
             {
@@ -271,10 +293,10 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                 _logger.LogInformation($"Player with connectionId {Context.ConnectionId} request to chagne session: {targetSession.SessionId} time to {gameTime} min");
 
                 var actionResult = await targetSession.SetGameDurationMinute(gameTime, Context.ConnectionId);
-                if(!actionResult)
+                if (!actionResult)
                 {
                     throw new HubException("Un-authorized action:Player is prohibit to alter session context.");
-                }    
+                }
             }
             catch (HubException ex)
             {
@@ -297,13 +319,24 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         {
             _logger.LogInformation($"Player:: {Context.ConnectionId} request to leave their Current Game Session");
             // delegate task to the game master
-            var sessionId = _gameMaster.OnPlayerLeftSession(Context.ConnectionId);
+            var session = _gameMaster.OnPlayerLeftSession(Context.ConnectionId);
 
             // we can decide if we want to notify all player in this group that player left
             // for now do nothing
-            _logger.LogInformation($"Player:: {Context.ConnectionId} is expelled from Session: {sessionId}"); 
+            _logger.LogInformation($"Player:: {Context.ConnectionId} is expelled from Session: {session.SessionId}");
             await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Player {Context.ConnectionId} is expell");
+            if (session == null)
+                return;
 
+            // session is about to be removed, therefore tell every one (not limited to those in the room) about it
+            if (session.GetScoresBoard().Length == 0)
+            {
+                await Clients.All.SendAsync(ClientMethods.SupplyAvailableSessions, _gameMaster.RetrieveActiveSession());
+                return;
+            }
+
+            // session has player left: notify every one about the player left
+            await Clients.Group(session.SessionId.ToString()).SendAsync(ClientMethods.NotifyReadyStatesChange, session.GetScoresBoard());
         }
     }
 }

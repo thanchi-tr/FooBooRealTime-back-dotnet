@@ -21,7 +21,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         private List<SessionPlayer> _participants { get; set; } = [];
         private SessionGamePlayData _gamePlayData { get; set; }
 
-        private SessionPlayer _host { get; set; }
+        public SessionPlayer _host { get; set; }
         public string GameName { get; set; }
         public GameSession(IHubContext<GameHub> hubContext, SessionPlayer host, SessionGamePlayData gamePlayData, string name)
         {
@@ -36,7 +36,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         }
 
         public Dictionary<int, string> GetRules() => _gamePlayData.Rules;
-
+        public double GetGameDurationMinute() => _gameDurationInMinute;
         /// <summary>
         /// 
         /// </summary>
@@ -58,6 +58,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             return actionResult;
         }
 
+        public string GetHost() => _host.InternalId.ToString() ?? "not reachable";
 
         /// <summary>
         /// Handle scenario where player is 
@@ -138,7 +139,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             if (_gamePlayData.CurrentState != GameState.PLAYING)
             {
                 _gameDurationInMinute = durationInMinute;
-                await _hubConnection.Clients.All.SendAsync(ClientMethods.SupplyGameTime, durationInMinute);
+                await _hubConnection.Clients.Group(SessionId.ToString()).SendAsync(ClientMethods.SupplyGameTime, durationInMinute);
                 AttemptToStart();
             }
             return true;
@@ -196,10 +197,10 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                 }                
                 _gamePlayData.NextState(); // game loop is about to start
                 var initQuestion = GetInitialQuestion();
-                await _hubConnection.Clients.All.SendAsync(ClientMethods.SupplyInitQuestion, initQuestion);
+                await _hubConnection.Clients.Group(SessionId.ToString()).SendAsync(ClientMethods.SupplyInitQuestion, initQuestion);
                 await Task.Delay(gameDuration);
                 // Notify all clients of game end
-                await _hubConnection.Clients.All.SendAsync(ClientMethods.NotifyGameEnd);
+                await _hubConnection.Clients.Group(SessionId.ToString()).SendAsync(ClientMethods.NotifyGameEnd);
                 _gamePlayData.NextState();
             }catch { 
                 throw; 
@@ -231,7 +232,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             var readyStateStr = (playerState) ? "Ready" : "Idling";
             await _hubConnection.Clients.Client(connectionId).SendAsync(ClientMethods.NotifyEvent, $"Player {connectionId} is {readyStateStr}");
             // @the group sending is having trouble, opt to the all instead.
-            await _hubConnection.Clients.All.SendAsync(ClientMethods.NotifyReadyStatesChange, _gamePlayData.Participants); 
+            await _hubConnection.Clients.Group(SessionId.ToString()).SendAsync(ClientMethods.NotifyReadyStatesChange, _gamePlayData.Participants); 
             AttemptToStart(); // if this player is the last in the room
             return result;
         }

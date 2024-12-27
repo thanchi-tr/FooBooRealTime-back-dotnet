@@ -17,5 +17,6 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         public const string SupplyGameContexts = "SupplyGameContexts";
         public const string NotifyReadyStatesChange = "NotifyReadyStatesChange";
         public const string SupplyGameTime = "SupplyGameTime";
+        public const string SupplyConnectionId = "SupplyConnectionId";  
     }
 }

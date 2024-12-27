@@ -6,6 +6,7 @@ using FooBooRealTime_back_dotnet.Interface.Utils;
 using FooBooRealTime_back_dotnet.Model.Domain;
 using FooBooRealTime_back_dotnet.Model.DTO;
 using FooBooRealTime_back_dotnet.Services;
+using FooBooRealTime_back_dotnet.Services.ExternalApi;
 using FooBooRealTime_back_dotnet.Services.GameContext;
 
 namespace backend.Configurations
@@ -18,6 +19,7 @@ namespace backend.Configurations
             services.AddSingleton<IGameMaster, GameMaster>();
             services.AddTransient<IGameService, GameService>();
             services.AddTransient<IPlayerService, PlayerService>();
+            services.AddHttpClient<ExternalApiService>();
             //services.AddTransient<IRandomIntSource,IRandomIntSource>();
             return services;
         }

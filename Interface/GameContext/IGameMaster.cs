@@ -18,7 +18,7 @@ namespace FooBooRealTime_back_dotnet.Interface.GameContext
         public GameSession[]? RetiveSessionsByContextName(string nameId);
 
         public GameSession[] RetrieveActiveSession();
-        public SessionPlayer GetActivePlayerDetail(string connectionId);
+        public SessionPlayer? GetActivePlayerDetail(string connectionId);
 
         public void OnPlayerConnect(string connectionId, SessionPlayer player);
 
@@ -26,6 +26,8 @@ namespace FooBooRealTime_back_dotnet.Interface.GameContext
 
         public Task<string[]> RetrieveAllGames();
 
-        public Guid? OnPlayerLeftSession(string requestorConnectionId);
+        public GameSession? OnPlayerLeftSession(string requestorConnectionId);
+
+        public void CachePlayerSession(string playerConnectionId, Guid sessionId);
     }
 }
