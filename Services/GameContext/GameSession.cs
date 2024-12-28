@@ -128,9 +128,8 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                         .SendAsync(ClientMethods.NotifyError, "Attempt to patch un-authorised material");
                 return false;
             }
-            if(_gamePlayData.CurrentState != GameState.PLAYING)
+            if(_gamePlayData.CurrentState == GameState.PLAYING)
             {
-
                 await _hubConnection
                         .Clients.Client(hostId)
                         .SendAsync(ClientMethods.NotifyError, "Attempt to change game time mid game");
@@ -277,6 +276,11 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         public void Update(GameDTO changes)
         {
             _gamePlayData.Update(changes);
+        }
+
+        public void BroadcastUpdate()
+        {
+            _hubConnection.Clients.Groups(SessionId.ToString()).SendAsync(ClientMethods.SupplySessionInfo, GameName, GetRules(), GetHost(), GetGameDurationMinute());
         }
     };
 

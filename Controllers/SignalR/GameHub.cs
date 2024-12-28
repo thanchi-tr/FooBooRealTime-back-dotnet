@@ -37,8 +37,9 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
 #pragma warning disable CS8604 // Possible null reference argument.
             Guid targetId = Context.ToGuidId();
 #pragma warning restore CS8604 // Possible null reference argument.
-            Console.WriteLine(targetId);
             await base.OnConnectedAsync();
+
+            // If the player is an existed player (who has lost connect), remap their connection
 
             _logger.LogInformation($"Connection Request: requestor ConnectionID: {Context.ConnectionId}");
             SessionPlayer? sessionPlayer = await SessionPlayer.CreateAsync(targetId, Context.ConnectionId, _playerService);
@@ -52,21 +53,27 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
             _logger.LogInformation($"Connection established: Notify {Context.ConnectionId} About the event.");
             await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, "Connection Establish");
         }
+
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             await base.OnDisconnectedAsync(exception);
+            _logger.LogInformation($"Disconnect====================================================================================");
             if (exception == null)
             {
                 _logger.LogInformation($"Player with Id:{Context.ConnectionId} is Disconnect");
+                LeftSession();
+
                 return;
             }
 
             _logger.LogError($"Hub:OnDisconnectedAsync: Err: {exception?.Message}");
         }
 
+        
+
         public async Task RequestConnectionId()
         {
-            _logger.LogInformation($"====================================================================================");
+            
             await Clients.Caller.SendAsync(ClientMethods.SupplyConnectionId, Context.ConnectionId);
         }
 
@@ -79,6 +86,21 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         {
             try
             {
+                // if player is already inside of this session, then supply them the upto date session data.
+                var playerSession = _gameMaster.GetSessionOf(Context.ConnectionId);
+                if (playerSession != null)
+                {
+                    if(playerSession.SessionId.ToString()   == sessionIdStr)
+                    {
+                        await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Successful: Player is Reconnected to loby of Room:{sessionIdStr}");
+                        await Clients.Caller.SendAsync(ClientMethods.SupplySessionInfo, playerSession.GameName, playerSession.GetRules(), playerSession.GetHost(), playerSession.GetGameDurationMinute());
+                        await Clients.Group(playerSession.SessionId.ToString()).SendAsync(ClientMethods.NotifyReadyStatesChange, playerSession.GetScoresBoard());
+                        _logger.LogInformation($"Session {playerSession.SessionId} is back to idling: Contains {playerSession.GetScoresBoard().Select(
+                            player => new { ConnectionId = player.playerConnectionId, State = player.IsReady }
+                        )}");
+                        return;
+                    }
+                }
                 _logger.LogInformation($"Connection Id: {Context.ConnectionId} Request to Join Session: {sessionIdStr}");
                 var sessionId = new Guid(sessionIdStr);
                 var activeSession = _gameMaster.RetrieveSession(sessionId);
@@ -88,23 +110,24 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
                     throw new HubException($"Connection Id:{Context.ConnectionId} Attempt to access non existed Session");
                 }
                 
-                
                 var actionResult = activeSession.Join(_gameMaster.GetActivePlayerDetail(Context.ConnectionId));
-                _gameMaster.CachePlayerSession(Context.ConnectionId, sessionId);
+                
                 if (actionResult)
                 {
+                    _gameMaster.CachePlayerSession(Context.ConnectionId, sessionId);
                     await Groups.AddToGroupAsync(Context.ConnectionId, activeSession.SessionId.ToString());
-                    await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Successful: Player is connected to Room {sessionIdStr}");
+                    await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Successful: Player is connected to loby of Room:{sessionIdStr}");
                     await Clients.Caller.SendAsync(ClientMethods.SupplySessionInfo, activeSession.GameName, activeSession.GetRules(), activeSession.GetHost(), activeSession.GetGameDurationMinute());
                     await Clients.Group(activeSession.SessionId.ToString()).SendAsync(ClientMethods.NotifyReadyStatesChange, activeSession.GetScoresBoard());
                     _logger.LogInformation($"Granted: Request by Connection Id: {Context.ConnectionId} is Successful");
-                    _logger.LogInformation($"Session {activeSession.SessionId}: Contains {activeSession.GetScoresBoard().Select(
+                    _logger.LogInformation($"Session {activeSession.SessionId} initialised and idling: Contains {activeSession.GetScoresBoard().Select(
                             player => new { ConnectionId = player.playerConnectionId, State=player.IsReady}
                         )}");
                 }
                 else
                 {
-                    await Clients.Caller.SendAsync(ClientMethods.NotifyError, $"Failure:Room {sessionIdStr} reject player connection");
+                    await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Failure:Room {sessionIdStr} reject player connection");
+                    await Clients.Caller.SendAsync(ClientMethods.NotifyRejection);
                     _logger.LogInformation($"Reject: Request by Connection Id: {Context.ConnectionId} is unsuccessful");
                 }
 
@@ -112,16 +135,19 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
             catch (FormatException ex)
             {
                 _logger.LogWarning($"Invalid session Id format: {sessionIdStr}. Error: {ex.Message}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyRejection);
                 await Clients.Caller.SendAsync(ClientMethods.NotifyError, "Invalid session ID format.");
             }
             catch (HubException ex)
             {
                 _logger.LogWarning($"Hub exception: {ex.Message}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyRejection);
                 await Clients.Caller.SendAsync(ClientMethods.NotifyError, ex.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError($"An unexpected error occurred: {ex}");
+                await Clients.Caller.SendAsync(ClientMethods.NotifyRejection);
                 await Clients.Caller.SendAsync(ClientMethods.NotifyError, "An unexpected error occurred.");
             }
         }
@@ -323,11 +349,12 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
 
             // we can decide if we want to notify all player in this group that player left
             // for now do nothing
-            _logger.LogInformation($"Player:: {Context.ConnectionId} is expelled from Session: {session.SessionId}");
             await Clients.Caller.SendAsync(ClientMethods.NotifyEvent, $"Player {Context.ConnectionId} is expell");
             if (session == null)
                 return;
 
+            _logger.LogInformation($"Player:: {Context.ConnectionId} is expelled from Session: {session.SessionId}");
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, session.SessionId.ToString()); // remove the player from group
             // session is about to be removed, therefore tell every one (not limited to those in the room) about it
             if (session.GetScoresBoard().Length == 0)
             {

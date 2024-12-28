@@ -33,8 +33,10 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             OnPlayerJoin(hostConnectionId);
         }
 
-        public void Update(GameDTO changes)
+        public void Update(GameDTO? changes)
         {
+            if (changes == null)
+                return;
             if (CurrentState != GameState.WAITING)
             {
                 _queuedChange = changes;
@@ -49,6 +51,10 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             if (changes.Range > 0)
             {
                 _gameRange = changes.Range;
+            }
+            if(changes == _queuedChange) // we just keep up to date with _queueChange
+            {
+                _queuedChange = null;   
             }
         }
 
@@ -89,6 +95,7 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
                 case GameState.PLAYING:
                     // place to do scoring, notify player game end with their performance
                     CurrentState = GameState.WAITING;
+                    Update(_queuedChange);
                     break;
                 default:
                     CurrentState = GameState.WAITING;

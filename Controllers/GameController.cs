@@ -1,4 +1,5 @@
-﻿using FooBooRealTime_back_dotnet.Interface.Service;
+﻿using FooBooRealTime_back_dotnet.Interface.GameContext;
+using FooBooRealTime_back_dotnet.Interface.Service;
 using FooBooRealTime_back_dotnet.Model.Domain;
 using FooBooRealTime_back_dotnet.Model.DTO;
 using Microsoft.AspNetCore.Authorization;
@@ -14,11 +15,13 @@ namespace FooBooRealTime_back_dotnet.Controllers
     {
         private readonly ILogger<IGameService> _logger;
         private readonly IGameService _gameService;
+        private readonly IGameMaster _gameMaster;
 
-        public GameController(ILogger<IGameService> logger, IGameService gameService)
+        public GameController(ILogger<IGameService> logger, IGameService gameService, IGameMaster gameMaster)
         {
             _logger = logger;
             _gameService = gameService;
+            _gameMaster = gameMaster;
         }
 
         [HttpPost("Players/{playerId}/Games/Game")]
@@ -50,6 +53,7 @@ namespace FooBooRealTime_back_dotnet.Controllers
         {
             gameDetail.AuthorId = playerId;
             var result = await _gameService.UpdateAsync(gameDetail, gameId);
+            _gameMaster.UpdateContext(gameDetail); // update the cache
             return (result != null)
                     ? NoContent()
                     : Unauthorized("Requestor is not authorised to delete the resource");

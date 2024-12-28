@@ -4,6 +4,6 @@ namespace FooBooRealTime_back_dotnet.Interface.GameContext
 {
     public interface IObserver
     {
-        public void Update(GameDTO changes);
+        public void Update(GameDTO? changes);
     }
 }

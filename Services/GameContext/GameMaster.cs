@@ -45,8 +45,16 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             {
                 return;
             }
-                // attempt to see if the player is re-connect using a different connectionId
-                var target = _activePlayers.FirstOrDefault(kvp => kvp.Value.InternalId == player.InternalId);
+            
+            if (_activePlayers.Where(kpv => kpv.Value.ConnectionId == connectionId).Count() > 0)
+            {
+                var kpv = _activePlayers.First(kpv => kpv.Value.ConnectionId == connectionId);
+                _activePlayers.Remove(kpv.Key, out var _);
+                _activePlayers[connectionId] = kpv.Value;
+                return;
+            }
+            // attempt to see if the player is re-connect using a different connectionId
+            var target = _activePlayers.FirstOrDefault(kvp => kvp.Value.InternalId == player.InternalId);
 
             // Remap the new connectionId
             if(!target.Equals(default(KeyValuePair<string, SessionPlayer>)))
@@ -223,6 +231,27 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
         public void Refresh(GameDTO changes)
         {
             throw new NotImplementedException();
+        }
+
+        public void UpdateContext(GameDTO changes)
+        {
+            if (_gameContexts.ContainsKey(changes.GameId))
+            {
+                var target = _gameContexts[changes.GameId];
+                if(changes.Range != target.Range) 
+                    target.Range = changes.Range;
+                if(changes.Rules != target.Rules) 
+                    target.Rules = changes.Rules;
+
+                target.NotifyObservers();
+
+                // notify all idling game about the change
+                foreach(var session in _activeSession.Where(s => s.Value.GameName == changes.GameId && s.Value.State() == GameState.WAITING).Select(kvp => kvp.Value).ToList())
+                {
+                    session.BroadcastUpdate();
+                }
+            }
+            
         }
     }
 }

@@ -29,5 +29,7 @@ namespace FooBooRealTime_back_dotnet.Interface.GameContext
         public GameSession? OnPlayerLeftSession(string requestorConnectionId);
 
         public void CachePlayerSession(string playerConnectionId, Guid sessionId);
+
+        public void UpdateContext(GameDTO changes);
     }
 }
