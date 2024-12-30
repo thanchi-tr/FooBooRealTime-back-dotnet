@@ -25,15 +25,14 @@ namespace FooBooRealTime_back_dotnet.Model.GameContext
         /// <param name="connectionId"></param>
         /// <param name="playerService"></param>
         /// <returns></returns>
-        public static async Task<SessionPlayer?> CreateAsync(Guid internalId,string? connectionId, IPlayerService playerService)
+        public static async Task<SessionPlayer?> CreateAsync(Guid internalId,string? connectionId, IPlayerService playerService, string? name )
         {
             var targetDomainPlayer = await playerService.GetByIdAsync(internalId);
-            Console.WriteLine( targetDomainPlayer);
             if (targetDomainPlayer == null)
             {
                 // create new
                 targetDomainPlayer = await playerService.CreateAsync(
-                    new DTO.PlayerDTO { Name="DefaultName", PlayerId= internalId }
+                    new DTO.PlayerDTO { Name= name ?? "DefaultName", PlayerId= internalId }
                 );
             }
             

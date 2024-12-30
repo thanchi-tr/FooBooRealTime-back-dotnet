@@ -19,5 +19,6 @@ namespace FooBooRealTime_back_dotnet.Controllers.SignalR
         public const string SupplyGameTime = "SupplyGameTime";
         public const string SupplyConnectionId = "SupplyConnectionId";
         public const string NotifyRejection = "NotifyRejection";
+        public const string SetNewHost = "SetNewHost";
     }
 }

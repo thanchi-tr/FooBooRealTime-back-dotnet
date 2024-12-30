@@ -7,6 +7,7 @@ using FooBooRealTime_back_dotnet.Model.GameContext;
 using FooBooRealTime_back_dotnet.Utils.Validator;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using static Azure.Core.HttpHeader;
 
 namespace FooBooRealTime_back_dotnet.Services.GameContext
@@ -204,7 +205,8 @@ namespace FooBooRealTime_back_dotnet.Services.GameContext
             if (requestorSession == null)
                 return null;
             requestorSession.OnLeftSession(requestorConnectionId);
-
+            _playerSessions.Remove(requestorConnectionId, out var _); // make sure the player session is remove from cache.
+            
             // if session is dead (no one left) then dispose it
             if (requestorSession.GetStatus() == SessionStatus.Dead)
             {
